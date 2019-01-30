@@ -3,6 +3,7 @@ package mumayank.com.aircamera.aircamera
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.hardware.Camera
 import android.view.ViewGroup
 import android.view.Window
@@ -29,6 +30,7 @@ class AirCameraUtil {
             contentLayout: ViewGroup?,
             mCamera: Camera?,
             onAirPermissions: (airPermission: AirPermissions)->Unit,
+            onNextFrameData: (data: ByteArray)->Unit,
             onSuccess: (mCamera: Camera) -> Unit,
             onError: () -> Unit
         ) {
@@ -45,7 +47,7 @@ class AirCameraUtil {
                 object: AirPermissions.Callbacks {
 
                     override fun onSuccess() {
-                        onPermissionsGranted(activity, contentLayout, mCamera, onSuccess, onError)
+                        onPermissionsGranted(activity, contentLayout, mCamera, onNextFrameData, onSuccess, onError)
                     }
 
                     override fun onFailure() {
@@ -57,9 +59,9 @@ class AirCameraUtil {
             onAirPermissions.invoke(airPermission)
         }
 
-        private fun onPermissionsGranted(activity: Activity?, contentLayout: ViewGroup?, mCamera: Camera?, onSuccess: (mCamera: Camera) -> Unit, onError: () -> Unit) {
+        private fun onPermissionsGranted(activity: Activity?, contentLayout: ViewGroup?, mCamera: Camera?, onNextFrameData: (data: ByteArray)->Unit, onSuccess: (mCamera: Camera) -> Unit, onError: () -> Unit) {
             if (isCameraHardwarePresent(activity)) {
-                onCameraHardwarePresent(activity, contentLayout, mCamera, onSuccess, onError)
+                onCameraHardwarePresent(activity, contentLayout, mCamera, onNextFrameData, onSuccess, onError)
             } else {
                 onError.invoke()
             }
@@ -69,10 +71,10 @@ class AirCameraUtil {
             return activity?.packageManager?.hasSystemFeature(PackageManager.FEATURE_CAMERA) ?: false
         }
 
-        private fun onCameraHardwarePresent(activity: Activity?, contentLayout: ViewGroup?, mCamera: Camera?, onSuccess: (mCamera: Camera) -> Unit, onError: () -> Unit) {
+        private fun onCameraHardwarePresent(activity: Activity?, contentLayout: ViewGroup?, mCamera: Camera?, onNextFrameData: (data: ByteArray)->Unit, onSuccess: (mCamera: Camera) -> Unit, onError: () -> Unit) {
             AirCameraUtil.initCamera(activity, contentLayout, onReleaseRequired = fun() {
                 AirCameraUtil.stopCamera(mCamera, contentLayout)
-            }, onSuccess = fun(camera: Camera?) {
+            }, onNextFrameData = onNextFrameData, onSuccess = fun(camera: Camera?) {
                 if (camera != null) {
                     onSuccess.invoke(camera)
                 } else {
@@ -83,7 +85,7 @@ class AirCameraUtil {
             })
         }
 
-        fun initCamera(activity: Activity?, contentLayout: ViewGroup?, onReleaseRequired:()->Unit, onSuccess:(mCamera: Camera)->Unit, onError:()->Unit) {
+        fun initCamera(activity: Activity?, contentLayout: ViewGroup?, onReleaseRequired:()->Unit, onNextFrameData: (data: ByteArray)->Unit, onSuccess:(mCamera: Camera)->Unit, onError:()->Unit) {
             doAsync {
                 try {
                     val mCamera = Camera.open()
@@ -92,10 +94,8 @@ class AirCameraUtil {
                         if (activity == null) {
                             onError.invoke()
                         } else {
-                            val cameraPreview2 = CameraPreview(activity, mCamera, fun() {
+                            val cameraPreview2 = CameraPreview(activity, mCamera, onNextFrameData, onReleaseRequired = fun() {
                                 onReleaseRequired.invoke()
-                            }, fun() {
-                                onError.invoke()
                             })
                             contentLayout?.addView(cameraPreview2)
                             onSuccess.invoke(mCamera)

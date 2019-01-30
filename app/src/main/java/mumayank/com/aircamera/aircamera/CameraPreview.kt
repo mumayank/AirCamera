@@ -2,16 +2,18 @@ package mumayank.com.aircamera.aircamera
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.hardware.Camera
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import org.jetbrains.anko.doAsync
 
 @SuppressLint("ViewConstructor")
 class CameraPreview(
     context: Context,
     private val mCamera: Camera?,
-    private val onReleaseRequired: ()->Unit,
-    private val onError: ()->Unit
+    private val onNextFrameData: (data: ByteArray)->Unit,
+    private val onReleaseRequired: ()->Unit
 ) : SurfaceView(context), SurfaceHolder.Callback {
 
     private val mHolder: SurfaceHolder = holder.apply {
@@ -35,6 +37,17 @@ class CameraPreview(
 
         mCamera?.stopPreview()
         mCamera?.setPreviewDisplay(holder)
+        mCamera?.setPreviewCallback { data, _ ->
+            if (data == null) {
+                return@setPreviewCallback
+            }
+
+            if (data.isEmpty()) {
+                return@setPreviewCallback
+            }
+
+            onNextFrameData.invoke(data)
+        }
         mCamera?.startPreview()
     }
 }

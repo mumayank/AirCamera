@@ -17,6 +17,13 @@ import org.jetbrains.anko.doAsync
 import org.jetbrains.anko.uiThread
 import java.io.IOException
 import java.lang.Exception
+import android.graphics.Bitmap
+import android.graphics.Rect
+import android.graphics.YuvImage
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+
 
 class AirCameraActivity : AppCompatActivity() {
 
@@ -26,18 +33,31 @@ class AirCameraActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AirCameraUtil.makeFullScreen(this, R.layout.activity_air_camera)
+
+
     }
 
     override fun onResume() {
         super.onResume()
 
-        //progressLayout.visibility = View.VISIBLE
-
         AirCameraUtil.startCamera(this, contentLayout, mCamera, onAirPermissions = fun(airPermission: AirPermissions) {
             this.airPermission = airPermission
+        }, onNextFrameData = fun(data: ByteArray) {
+            doAsync {
+                val parameters = mCamera?.parameters
+                val size = parameters?.previewSize
+                if (size?.height != null) {
+                    val image = YuvImage(data, parameters.previewFormat, size.width, size.height, null)
+                    val file = File.createTempFile(System.currentTimeMillis().toString(), null, cacheDir)
+                    val fileOutputStream = FileOutputStream(file)
+                    image.compressToJpeg(Rect(0, 0, size.width, size.height), 100, fileOutputStream)
+                    val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                    imageView.setImageBitmap(bitmap)
+                    val i = 0
+                }
+            }
         }, onSuccess = fun(mCamera: Camera) {
             this.mCamera = mCamera
-            //progressLayout.visibility = View.GONE
         }, onError = fun() {
             Toast.makeText(this, "Camera is inaccessible", Toast.LENGTH_SHORT).show()
             finish()
