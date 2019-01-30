@@ -52,8 +52,9 @@ class AirCameraActivity : AppCompatActivity() {
                     val fileOutputStream = FileOutputStream(file)
                     image.compressToJpeg(Rect(0, 0, size.width, size.height), 100, fileOutputStream)
                     val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                    imageView.setImageBitmap(bitmap)
-                    val i = 0
+                    uiThread {
+                        imageView.setImageBitmap(bitmap)
+                    }
                 }
             }
         }, onSuccess = fun(mCamera: Camera) {
