@@ -5,56 +5,36 @@ import android.content.Context
 import android.hardware.Camera
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import java.lang.Exception
 
 @SuppressLint("ViewConstructor")
-class CameraPreview(context: Context, var cameraTop: Camera?, val onResume:()->Unit): SurfaceView(context), SurfaceHolder.Callback {
+class CameraPreview(
+    context: Context,
+    private val mCamera: Camera?,
+    private val onReleaseRequired: ()->Unit,
+    private val onError: ()->Unit
+) : SurfaceView(context), SurfaceHolder.Callback {
 
-    private var surfaceHolder: SurfaceHolder? = null
-
-    init {
-        surfaceHolder = holder
-        surfaceHolder?.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS)
-        surfaceHolder?.addCallback(this)
+    private val mHolder: SurfaceHolder = holder.apply {
+        addCallback(this@CameraPreview)
+        setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS)
     }
 
-    override fun surfaceCreated(holder: SurfaceHolder?) {
-        cameraTop?.apply {
-            try {
-                setPreviewDisplay(surfaceHolder)
-                startPreview()
-            } catch (e: Exception) {
-                // do nothing
-            }
-        }
+    override fun surfaceCreated(holder: SurfaceHolder) {
+        mCamera?.setPreviewDisplay(holder)
+        mCamera?.startPreview()
     }
 
-    override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
-        onResume.invoke()
+    override fun surfaceDestroyed(holder: SurfaceHolder) {
+        onReleaseRequired.invoke()
+    }
 
-        if (surfaceHolder?.surface == null) {
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
+        if (mHolder.surface == null) {
             return
         }
 
-        try {
-            cameraTop?.stopPreview()
-        } catch (e: Exception) {
-            // do nothing
-        }
-
-        cameraTop?.apply {
-            try {
-                setPreviewDisplay(surfaceHolder)
-                startPreview()
-            } catch (e: Exception) {
-                // do nothing
-            }
-        }
+        mCamera?.stopPreview()
+        mCamera?.setPreviewDisplay(holder)
+        mCamera?.startPreview()
     }
-
-    override fun surfaceDestroyed(holder: SurfaceHolder?) {
-        cameraTop?.stopPreview()
-        cameraTop?.release()
-    }
-
 }

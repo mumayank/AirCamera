@@ -1,11 +1,13 @@
 package mumayank.com.aircamera.aircamera
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.hardware.Camera
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.view.*
 import android.widget.Toast
 import kotlinx.android.synthetic.main.activity_air_camera.*
@@ -19,41 +21,27 @@ import java.lang.Exception
 class AirCameraActivity : AppCompatActivity() {
 
     private var airPermission: AirPermissions? = null
-    private var cameraTop: Camera? = null
-    private var cameraPreview: CameraPreview? = null
+    private var mCamera: Camera? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestWindowFeature(Window.FEATURE_NO_TITLE)
-        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
-        setContentView(R.layout.activity_air_camera)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        supportActionBar?.hide()
+        AirCameraUtil.makeFullScreen(this, R.layout.activity_air_camera)
     }
 
     override fun onResume() {
         super.onResume()
-        startCam()
-    }
 
-    private fun startCam() {
-        progressLayout.visibility = View.VISIBLE
-        stopCam()
-        airPermission = AirPermissions(
-            this,
-            arrayOf(
-                android.Manifest.permission.CAMERA
-            ),
-            object: AirPermissions.Callbacks {
-                override fun onSuccess() {
-                    onPermissionGranted()
-                }
+        //progressLayout.visibility = View.VISIBLE
 
-                override fun onFailure() {
-                    finish()
-                }
-            }
-        )
+        AirCameraUtil.startCamera(this, contentLayout, mCamera, onAirPermissions = fun(airPermission: AirPermissions) {
+            this.airPermission = airPermission
+        }, onSuccess = fun(mCamera: Camera) {
+            this.mCamera = mCamera
+            //progressLayout.visibility = View.GONE
+        }, onError = fun() {
+            Toast.makeText(this, "Camera is inaccessible", Toast.LENGTH_SHORT).show()
+            finish()
+        })
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -61,56 +49,9 @@ class AirCameraActivity : AppCompatActivity() {
         airPermission?.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
-    private fun onPermissionGranted() {
-        if (checkIfCameraHardwarePresent(this)) {
-            onCameraHardwarePresent()
-        } else {
-            Toast.makeText(this, "Camera is not present", Toast.LENGTH_SHORT).show()
-            finish()
-        }
-    }
-
-    private fun checkIfCameraHardwarePresent(context: Context): Boolean {
-        return context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA)
-    }
-
-    private fun onCameraHardwarePresent() {
-        doAsync {
-            try {
-                cameraTop = Camera.open()
-                cameraTop?.setDisplayOrientation(90)
-                uiThread {
-                    cameraPreview = CameraPreview(this@AirCameraActivity, cameraTop) {
-                        cameraTop?.startPreview()
-                    }
-                    contentLayout?.addView(cameraPreview)
-                    cameraPreview?.post {
-                        cameraTop?.startPreview()
-                        progressLayout.visibility = View.GONE
-                    }
-                    // camera.takePicture(null, null, pictureCallback);
-                }
-            } catch (e: Exception) {
-                uiThread {
-                    Toast.makeText(this@AirCameraActivity, "Camera is inaccessible\n$e", Toast.LENGTH_SHORT).show()
-                    finish()
-                }
-            }
-        }
-    }
-
     override fun onPause() {
-        stopCam()
+        AirCameraUtil.stopCamera(mCamera, contentLayout)
         super.onPause()
-    }
-
-    private fun stopCam() {
-        if (cameraTop != null) {
-            cameraPreview?.cameraTop = null
-            cameraTop?.stopPreview()
-            cameraTop?.release()
-            cameraTop = null
-        }
     }
 
 }
