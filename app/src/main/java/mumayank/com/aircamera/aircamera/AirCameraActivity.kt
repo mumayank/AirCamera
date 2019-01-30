@@ -20,6 +20,7 @@ import java.lang.Exception
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.graphics.YuvImage
+import com.bumptech.glide.Glide
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -53,7 +54,7 @@ class AirCameraActivity : AppCompatActivity() {
                     image.compressToJpeg(Rect(0, 0, size.width, size.height), 100, fileOutputStream)
                     val bitmap = BitmapFactory.decodeFile(file.absolutePath)
                     uiThread {
-                        imageView.setImageBitmap(bitmap)
+                        Glide.with(this@AirCameraActivity).load(bitmap).into(imageView)
                     }
                 }
             }
