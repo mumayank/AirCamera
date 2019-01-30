@@ -8,6 +8,7 @@ import android.hardware.Camera
 import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import mumayank.com.airpermissions.AirPermissions
 import org.jetbrains.anko.doAsync
@@ -51,6 +52,12 @@ class AirCameraUtil {
                     }
 
                     override fun onFailure() {
+                        onError.invoke()
+                    }
+
+                    override fun onAnyPermissionPermanentlyDenied() {
+                        AirPermissions.openAppPermissionSettings(activity)
+                        Toast.makeText(activity, "Permissions were permanently disabled. Please enable manually from app settings and try again.", Toast.LENGTH_SHORT).show()
                         onError.invoke()
                     }
                 }
