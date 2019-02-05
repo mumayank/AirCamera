@@ -20,7 +20,12 @@ import java.lang.Exception
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.graphics.YuvImage
+import android.graphics.drawable.Drawable
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -30,50 +35,81 @@ class AirCameraActivity : AppCompatActivity() {
 
     private var airPermission: AirPermissions? = null
     private var mCamera: Camera? = null
+    private var isProcessing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AirCameraUtil.makeFullScreen(this, R.layout.activity_air_camera)
-
-
     }
 
     override fun onResume() {
         super.onResume()
 
-        AirCameraUtil.startCamera(this, contentLayout, mCamera, onAirPermissions = fun(airPermission: AirPermissions) {
-            this.airPermission = airPermission
-        }, onNextFrameData = fun(data: ByteArray) {
-            doAsync {
-                val parameters = mCamera?.parameters
-                val size = parameters?.previewSize
-                if (size?.height != null) {
-                    val image = YuvImage(data, parameters.previewFormat, size.width, size.height, null)
-                    val file = File.createTempFile(System.currentTimeMillis().toString(), null, cacheDir)
-                    val fileOutputStream = FileOutputStream(file)
-                    image.compressToJpeg(Rect(0, 0, size.width, size.height), 100, fileOutputStream)
-                    val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                    uiThread {
-                        Glide.with(this@AirCameraActivity).load(bitmap).into(imageView)
+        airPermission = AirPermissions(
+            this,
+            arrayOf(
+                android.Manifest.permission.CAMERA
+            ),
+            object: AirPermissions.Callbacks {
+
+                override fun onSuccess() {
+                    onPermissionsPresent()
+                }
+
+                override fun onFailure() {
+                    Toast.makeText(this@AirCameraActivity, "Permission denied", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+
+                override fun onAnyPermissionPermanentlyDenied() {
+                    Toast.makeText(this@AirCameraActivity, "Please enable permissions from settings", Toast.LENGTH_SHORT).show()
+                    AirPermissions.openAppPermissionSettings(this@AirCameraActivity)
+                    finish()
+                }
+
+            }
+        )
+
+    }
+
+    private fun onPermissionsPresent() {
+        AirCameraUtil2.initCamera(
+            this,
+            contentLayout,
+            onNextFrameData = fun(data: ByteArray) {
+
+                if (isProcessing) {
+                    return
+                }
+
+                doAsync {
+                    val parameters = mCamera?.parameters
+                    val size = parameters?.previewSize
+                    if (size?.height != null) {
+                        val image = YuvImage(data, parameters.previewFormat, size.width, size.height, null)
+                        val file = File.createTempFile(System.currentTimeMillis().toString(), null, cacheDir)
+                        val fileOutputStream = FileOutputStream(file)
+                        image.compressToJpeg(Rect(0, 0, size.width, size.height), 100, fileOutputStream)
+                        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                        uiThread {
+                            // Glide.with(this@AirCameraActivity).load(bitmap).into(imageView)
+                            isProcessing = false
+                        }
                     }
                 }
+
+            }, onSuccess = fun(mCamera: Camera?) {
+                this.mCamera = mCamera
+            }, onError = fun() {
+                Toast.makeText(this@AirCameraActivity, "Camera Error", Toast.LENGTH_SHORT).show()
+                finish()
             }
-        }, onSuccess = fun(mCamera: Camera) {
-            this.mCamera = mCamera
-        }, onError = fun() {
-            Toast.makeText(this, "Camera is inaccessible", Toast.LENGTH_SHORT).show()
-            finish()
-        })
+        )
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         airPermission?.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    }
-
-    override fun onPause() {
-        AirCameraUtil.stopCamera(mCamera, contentLayout)
-        super.onPause()
     }
 
 }
